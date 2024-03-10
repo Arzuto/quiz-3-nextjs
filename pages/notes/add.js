@@ -25,13 +25,15 @@ export default function AddNotes() {
 
   const HandleSubmit = async () => {
     const response = await mutate({
-      url: "https://paace-f178cafcae7b.nevacloud.io/api/notes",
-      payload: notes
-    })
-    if(response?.success){
-      router.push('/notes')
+      url: "/api/addNotes",
+      method: "POST",
+      payload: notes,
+    });
+
+    if (response?.success) {
+      router.push('/notes');
     }
-   };
+  };
  return (
   <>
     <LayoutComponent metaTitle="Notes" metaDescription="Ini adalah halaman Tambah Notes">

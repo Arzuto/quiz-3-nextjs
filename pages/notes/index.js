@@ -28,18 +28,59 @@ import { useRouter } from "next/router"
 import { useQueries } from "@/hooks/useQueries"
 import fetcher from "@/utils/fetcher"
 import useSWR from "swr"
+import { useMutation } from "@/hooks/useMutation"
 
 const LayoutComponent = dynamic(() => import("@/layout"))
 
 export default function Notes() {
   const router = useRouter();
+  const { mutate } =  useMutation()
+
 
   //fetching list notes//
 
   // const { data, isLoading } = useQueries({ prefixUrl: 'https://paace-f178cafcae7b.nevacloud.io/api/notes' });  
-  const {data, error, isLoading} = useSWR("https://paace-f178cafcae7b.nevacloud.io/api/notes",fetcher, {refreshInterval: 5})
+  const {data, error, isLoading} = useSWR("/api/listNotes",fetcher, {refreshInterval: 5})
 
   //fetching list notes//
+
+  //add notes//
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [notes, setNotes] = useState({
+    title: '',
+    description: ''
+  });
+
+  const HandleOpenModal = () => {
+    setIsAddModalOpen(true);
+  };
+
+  const HandleCloseModal = () => {
+    setIsAddModalOpen(false);
+  };
+
+  const HandleInputChange = (event) => {
+    const { name, value } = event.target;
+    setNotes(prevNotes => ({
+      ...prevNotes,
+      [name]: value
+    }));
+  };
+
+  const HandleSubmit = async () => {
+    const response = await mutate({
+      url: "/api/addNotes",
+      method: "POST",
+      payload: notes,
+    });
+
+    if (response?.success) {
+      // router.push('/notes');
+      setIsAddModalOpen(false)
+    }
+  };
+
+  //add notes//
 
 
   //delete notes//
@@ -50,20 +91,19 @@ export default function Notes() {
 
   const HandleDelete = async (id) => {
     try {
-     const response = await fetch(
-      `https://paace-f178cafcae7b.nevacloud.io/api/notes/delete/
-      ${id}`,
-      {
-       method: "DELETE",
-      })
+      const response = await fetch(`/api/deleteNotes?id=${id}`, {
+        method: "DELETE",
+      });
       const result = await response.json();
       if (result?.success) {
-       router.reload();
+        // router.reload();
       }
-    } catch (error) {}
-   }
+    } catch (error) {
+      console.error("Error deleting note:", error);
+    }
+  };
 
-   const handleDeleteConfirmation = (id) => {
+   const HandleDeleteConfirmation = (id) => {
     HandleDelete(id);
     setIsDeleteModalOpen(false);
   };
@@ -76,10 +116,8 @@ export default function Notes() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [itemtoEditId, setItemToEditId] = useState(null);
   const [editedNotes, setEditedNotes] = useState({ title: '', description: '' });
-// Fetch note data using SWR
-const { data: noteData, error: noteError } = useSWR(itemtoEditId ? `https://paace-f178cafcae7b.nevacloud.io/api/notes/${itemtoEditId}` : null, fetcher);
+  const { data: noteData, error: noteError } = useSWR(itemtoEditId ? `https://paace-f178cafcae7b.nevacloud.io/api/notes/${itemtoEditId}` : null, fetcher);
 
-// Set initial state of editedNotes when noteData changes
 useEffect(() => {
   if (noteData) {
     console.log("Note Data:", noteData);
@@ -90,11 +128,10 @@ useEffect(() => {
   }
 }, [noteData]);
 
-  // Function to handle editing notes
-  const handleEditSubmit = async () => {
+  const HandleEditSubmit = async () => {
     try {
       const response = await fetch(
-        `https://paace-f178cafcae7b.nevacloud.io/api/notes/update/${itemtoEditId}`,
+        `/api/editNotes?id=${itemtoEditId}`,
         {
           method: "PATCH",
           headers: {
@@ -126,7 +163,8 @@ useEffect(() => {
     <LayoutComponent metaTitle="Notes" metaDescription="Ini adalah halaman Notes">
       <Box padding="5">
         <Flex justifyContent="end">
-          <Button colorScheme="blue" onClick={() => router.push('/notes/add')}>Add Button</Button>
+          {/* <Button colorScheme="blue" onClick={() => router.push('/notes/add')}>Add Button</Button> */}
+          <Button colorScheme="blue" onClick={HandleOpenModal}>Add Notes</Button>
         </Flex>
         {
           isLoading ? (
@@ -156,11 +194,11 @@ useEffect(() => {
                          {/* <Button onClick={() => router.push(`/notes/edit/${item?.id}`)} flex="1" variant="ghost">
                           Edit
                          </Button> */}
-<Button onClick={() => {
-  console.log("Item ID:", item?.id);
-  setItemToEditId(item?.id); // Set the ID of the item to edit
-  setIsEditModalOpen(true); // Open the edit modal
-}} flex="1" variant="ghost">Edit</Button>
+                          <Button onClick={() => {
+                            console.log("Item ID:", item?.id);
+                            setItemToEditId(item?.id);
+                            setIsEditModalOpen(true);
+                          }} flex="1" variant="ghost">Edit</Button>
                          <Button onClick={() => {
                             setItemToDeleteId(item?.id); 
                             setIsDeleteModalOpen(true);
@@ -173,6 +211,30 @@ useEffect(() => {
                 ))
               }
             </Grid>
+            {/* modal add */}
+            <Modal isOpen={isAddModalOpen} onClose={HandleCloseModal}>
+              <ModalOverlay />
+              <ModalContent>
+                <ModalHeader>Add Notes</ModalHeader>
+                <ModalCloseButton />
+                <ModalBody>
+                  <Grid gap="5">
+                    <GridItem>
+                      <Text>Title</Text>
+                      <Input name="title" value={notes.title} onChange={HandleInputChange} type="text"/>
+                    </GridItem>
+                    <GridItem>
+                      <Text>Description</Text>
+                      <Textarea name="description" value={notes.description} onChange={HandleInputChange} />
+                    </GridItem>
+                  </Grid>
+                </ModalBody>
+                <ModalFooter>
+                  <Button colorScheme="blue" mr={3} onClick={HandleSubmit}>Submit</Button>
+                  <Button onClick={HandleCloseModal}>Cancel</Button>
+                </ModalFooter>
+              </ModalContent>
+            </Modal>
             {/* modal delete */}
             <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)}>
               <ModalOverlay />
@@ -183,7 +245,7 @@ useEffect(() => {
                   Apakah yakin ingin menghapus note ini ?
                 </ModalBody>
                 <ModalFooter>
-                <Button colorScheme="red" mr={3} onClick={() => handleDeleteConfirmation(itemToDeleteId)}>
+                <Button colorScheme="red" mr={3} onClick={() => HandleDeleteConfirmation(itemToDeleteId)}>
                     Delete
                   </Button>
                   <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)}>Cancel</Button>
@@ -191,32 +253,31 @@ useEffect(() => {
               </ModalContent>
             </Modal>
 
-      {/* Edit Modal */}
-      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
-    <ModalOverlay />
-    <ModalContent>
-      <ModalHeader>Edit Notes</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody>
-        <Text>Title</Text>
-        <Input 
-          value={editedNotes.title} 
-          onChange={(event) => setEditedNotes({...editedNotes, title: event.target.value})}
-          type="text"
-        />
-        <Text mt={2}>Description</Text>
-        <Textarea 
-          value={editedNotes.description} 
-          onChange={(event) => setEditedNotes({...editedNotes, description: event.target.value})}
-        />
-      </ModalBody>
-      <ModalFooter>
-        <Button colorScheme="blue" onClick={handleEditSubmit}>Submit</Button>
-        <Button variant="ghost" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-      </ModalFooter>
-    </ModalContent>
-  </Modal>
-
+            {/* Edit Modal */}
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
+              <ModalOverlay />
+              <ModalContent>
+                <ModalHeader>Edit Notes</ModalHeader>
+                <ModalCloseButton />
+                <ModalBody>
+                  <Text>Title</Text>
+                  <Input 
+                    value={editedNotes.title} 
+                    onChange={(event) => setEditedNotes({...editedNotes, title: event.target.value})}
+                    type="text"
+                  />
+                  <Text mt={2}>Description</Text>
+                  <Textarea 
+                    value={editedNotes.description} 
+                    onChange={(event) => setEditedNotes({...editedNotes, description: event.target.value})}
+                  />
+                </ModalBody>
+                <ModalFooter>
+                  <Button colorScheme="blue" onClick={HandleEditSubmit}>Submit</Button>
+                  <Button variant="ghost" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+                </ModalFooter>
+              </ModalContent>
+            </Modal>
           </Flex>
           )
         }
